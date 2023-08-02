@@ -1,0 +1,41 @@
+import sqlite3
+import atexit
+
+
+class Database:
+    """A reply database. Stores replies only, for easier training"""
+    def __init__(self, database="database"):
+        """Pass a name for the database"""
+        self.conn = sqlite3.connect(f'./data/{database}.db')
+        self.c = self.conn.cursor()
+        print("Database connected")
+        atexit.register(self.cleanup)
+
+    def create_table(self, table_name: str, primary_key: dict, columns: dict):
+        """All items must be key/value dicts, key should be the name of the column, and value its respective data type.
+        Ex: {"userid": "INT"}, {"content": "TEXT"}"""
+        primary_key = ", ".join(f"{k} {v}" for k, v in primary_key.items())
+        column_keys = ", ".join(f"{k} {v}" for k, v in columns.items())
+        self.c.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({primary_key} PRIMARY KEY, {column_keys})")
+
+    def add_entry(self, table_name, input_dict):
+        columns = ', '.join(input_dict.keys())
+        placeholders = ', '.join('?' * len(input_dict))
+        sql_string = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        self.c.execute(sql_string, tuple(input_dict.values()))
+        self.conn.commit()
+
+    def get_entries(self, table_name, column_list: list, order_by: dict = None):
+        """Fetches a tuple of tuples from the database. order_by= dict {"key": "DESC"}"""
+        column_str = ', '.join(column_list)
+        if order_by is not None:
+            order_by = " ".join(f"{k} {v}" for k, v in order_by.items())
+            order_by = f" {order_by}"
+        else: order_by = ""
+        sql_string = f"SELECT {column_str} FROM {table_name}{order_by}"
+        self.c.execute(sql_string) #Fetches context from sql server
+        return self.c.fetchall()
+    
+    def cleanup(self):
+        self.conn.close()
+        print("Disconnecting from database")
